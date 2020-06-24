@@ -15,6 +15,10 @@ namespace BouncingBallSim.Simulation
 
         public bool IsActive { get; set; } = true;
 
+        public float AccelerationDueToGravity { get; set; } = 981f;
+
+        public float CoefficientOfRestitution { get; set; } = 0.5f;
+
         public float InitialVelocityX { get; set; } = 0f;
 
         public float InitialVelocityY { get; set; } = 0f;
@@ -33,6 +37,7 @@ namespace BouncingBallSim.Simulation
         // Fields
         private SKPoint skPosition;
         private Vector2 skVelocity;
+        private Vector2 skForce;
         private SKRect skBallBounds = default;
         private readonly Stopwatch stopwatch = new Stopwatch();
         private const double desiredFps = 30.0;
@@ -63,7 +68,30 @@ namespace BouncingBallSim.Simulation
             // As long as we have initialised we can simulate
             if (isInitialised)
             {
-                // Update position with a first order backward difference scheme
+                // Reset force vector to gravity only
+                skForce.X = 0;
+                skForce.Y = AccelerationDueToGravity;
+
+                // Collision detection -- compute change in momentum to work out the force required
+                if ((skBallBounds.Left < 0 && skVelocity.X < 0) || (skBallBounds.Right > canvasWidth && skVelocity.X > 0))
+                {
+                    skForce.X = -(float)(skVelocity.X * (1 + CoefficientOfRestitution) / dt);
+                    if (skBallBounds.Left < 0 && skVelocity.X < 0) skPosition.X += skBallBounds.Left;
+                    else skPosition.X += canvasWidth - skBallBounds.Right;
+                }
+
+                if ((skBallBounds.Top < 0 && skVelocity.Y < 0) || (skBallBounds.Bottom > canvasHeight && skVelocity.Y > 0))
+                {
+                    skForce.Y = -(float)(skVelocity.Y * (1 + CoefficientOfRestitution) / dt);
+                    if (skBallBounds.Top < 0 && skVelocity.Y < 0) skPosition.Y += skBallBounds.Top;
+                    else skPosition.Y += canvasHeight - skBallBounds.Bottom;
+                }
+
+                // Compute du from force
+                skVelocity.Y += (float)dt * skForce.Y;
+                skVelocity.X += (float)dt * skForce.X;
+
+                // Compute dr from velocity
                 skPosition.X += (float)dt * skVelocity.X;
                 skPosition.Y += (float)dt * skVelocity.Y;
 
@@ -74,13 +102,6 @@ namespace BouncingBallSim.Simulation
                     skPosition.X + skBallDiameter / 2,
                     skPosition.Y + skBallDiameter / 2
                     );
-
-                // Collision detection
-                if ((skBallBounds.Left < 0 && skVelocity.X < 0) || (skBallBounds.Right > canvasWidth && skVelocity.X > 0))
-                    skVelocity.X *= -1;
-
-                if ((skBallBounds.Top < 0 && skVelocity.Y < 0) || (skBallBounds.Bottom > canvasHeight && skVelocity.Y > 0))
-                    skVelocity.Y *= -1;
             }
 
             // Calculate current fps

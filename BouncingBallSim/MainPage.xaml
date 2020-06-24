@@ -10,8 +10,7 @@
     <ContentPage.Content>
         <Grid>
             <sim:SimulationView BallDiameter="100"
-                                InitialVelocityX="200"
-                                InitialVelocityY="200"/>
+                                InitialVelocityX="100"/>
         </Grid>
     </ContentPage.Content>
 
