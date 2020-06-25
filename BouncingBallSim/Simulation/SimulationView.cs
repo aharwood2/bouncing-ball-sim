@@ -27,6 +27,8 @@ namespace BouncingBallSim.Simulation
 
         public float InitialPositionY { get; set; } = 0f;
 
+        public float ForceScale { get; set; } = 500f;
+
         public SimulationView()
         {
             PaintSurface += SimulationView_PaintSurface;
@@ -38,6 +40,9 @@ namespace BouncingBallSim.Simulation
         private SKPoint skPosition;
         private Vector2 skVelocity;
         private Vector2 skForce;
+        private Vector2 skTouchForce;
+        private SKPoint oldTouchLocation;
+        private SKPoint diffLocation;
         private SKRect skBallBounds = default;
         private readonly Stopwatch stopwatch = new Stopwatch();
         private const double desiredFps = 30.0;
@@ -47,6 +52,7 @@ namespace BouncingBallSim.Simulation
         private float skBallDiameter;
         private int fpsCount;
         private double fpsSum;
+        private bool touching;
 
         private void Init()
         {
@@ -54,10 +60,10 @@ namespace BouncingBallSim.Simulation
             var ts = TimeSpan.FromMilliseconds(ms);
 
             // Create a timer that triggers every 1/fps seconds
-            Device.StartTimer(ts, Update);
+            Device.StartTimer(ts, Simulate);
         }
 
-        private bool Update()
+        private bool Simulate()
         {
             // Get the elapsed time from the stopwatch because the 1/fps timer interval is not accurate and can be off by 2 ms
             var dt = stopwatch.Elapsed.TotalSeconds;
@@ -66,7 +72,7 @@ namespace BouncingBallSim.Simulation
             stopwatch.Restart();
 
             // As long as we have initialised we can simulate
-            if (isInitialised)
+            if (isInitialised && !touching)
             {
                 // Reset force vector to gravity only
                 skForce.X = 0;
@@ -87,6 +93,14 @@ namespace BouncingBallSim.Simulation
                     else skPosition.Y += canvasHeight - skBallBounds.Bottom;
                 }
 
+                // Add in touch forces and rest force vector
+                if (skTouchForce.X != 0 || skTouchForce.Y != 0)
+                {
+                    Debug.WriteLine($"Adding forces: {skTouchForce}");
+                    skForce += skTouchForce;
+                    skTouchForce = new Vector2(0);
+                }
+
                 // Compute du from force
                 skVelocity.Y += (float)dt * skForce.Y;
                 skVelocity.X += (float)dt * skForce.X;
@@ -94,15 +108,15 @@ namespace BouncingBallSim.Simulation
                 // Compute dr from velocity
                 skPosition.X += (float)dt * skVelocity.X;
                 skPosition.Y += (float)dt * skVelocity.Y;
-
-                // Update the bounds
-                skBallBounds = new SKRect(
-                    skPosition.X - skBallDiameter / 2,
-                    skPosition.Y - skBallDiameter / 2,
-                    skPosition.X + skBallDiameter / 2,
-                    skPosition.Y + skBallDiameter / 2
-                    );
             }
+
+            // Update the bounds
+            skBallBounds = new SKRect(
+                skPosition.X - skBallDiameter / 2,
+                skPosition.Y - skBallDiameter / 2,
+                skPosition.X + skBallDiameter / 2,
+                skPosition.Y + skBallDiameter / 2
+                );
 
             // Calculate current fps
             var fps = dt > 0 ? 1.0 / dt : 0;
@@ -136,7 +150,7 @@ namespace BouncingBallSim.Simulation
             var surface = e.Surface;
             var canvas = surface.Canvas;
             canvas.Clear();
-            
+
             // Initialise if first pass
             if (!isInitialised)
             {
@@ -186,6 +200,43 @@ namespace BouncingBallSim.Simulation
 
         protected override void OnTouch(SKTouchEventArgs e)
         {
+            switch (e.ActionType)
+            {
+                case SKTouchAction.Pressed:
+                    if (skBallBounds.Contains(e.Location))
+                    {
+                        touching = true;
+                        skTouchForce = new Vector2(0);
+                        oldTouchLocation = e.Location;
+                        skPosition.X = e.Location.X;
+                        skPosition.Y = e.Location.Y;
+                        skVelocity.X = 0;
+                        skVelocity.Y = 0;
+                    }                    
+                    break;
+
+                case SKTouchAction.Moved:
+                    if (touching)
+                    {
+                        diffLocation = e.Location - oldTouchLocation;
+                        oldTouchLocation = e.Location;
+                        skPosition.X = e.Location.X;
+                        skPosition.Y = e.Location.Y;
+                    }
+                    break;
+
+                case SKTouchAction.Released:
+                    if (touching)
+                    {
+                        skTouchForce.X = diffLocation.X * ForceScale;
+                        skTouchForce.Y = diffLocation.Y * ForceScale;
+                    }
+                    touching = false;
+                    break;
+            }
+
+            e.Handled = true;
+
             base.OnTouch(e);
         }
     }
