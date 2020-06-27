@@ -11,6 +11,7 @@ namespace BouncingBallSim.Simulation
 {
     class SimulationView : SKCanvasView
     {
+        // Properties we can ge the user to set (not bindable though)
         public float BallDiameter { get; set; }
 
         public bool IsActive { get; set; } = true;
@@ -29,6 +30,7 @@ namespace BouncingBallSim.Simulation
 
         public float ForceScale { get; set; } = 500f;
 
+        // Ctor
         public SimulationView()
         {
             PaintSurface += SimulationView_PaintSurface;
@@ -56,6 +58,7 @@ namespace BouncingBallSim.Simulation
 
         private void Init()
         {
+            // Use desired fps to work out timer frequency
             var ms = 1000.0 / desiredFps;
             var ts = TimeSpan.FromMilliseconds(ms);
 
@@ -65,7 +68,7 @@ namespace BouncingBallSim.Simulation
 
         private bool Simulate()
         {
-            // Get the elapsed time from the stopwatch because the 1/fps timer interval is not accurate and can be off by 2 ms
+            // Get the elapsed time from the stopwatch because the 1/fps timer interval is not accurate
             var dt = stopwatch.Elapsed.TotalSeconds;
 
             // Restart the time measurement for the next time this method is called
@@ -82,6 +85,8 @@ namespace BouncingBallSim.Simulation
                 if ((skBallBounds.Left < 0 && skVelocity.X < 0) || (skBallBounds.Right > canvasWidth && skVelocity.X > 0))
                 {
                     skForce.X = -(float)(skVelocity.X * (1 + CoefficientOfRestitution) / dt);
+
+                    // Physically move the ball back to the wall
                     if (skBallBounds.Left < 0 && skVelocity.X < 0) skPosition.X += skBallBounds.Left;
                     else skPosition.X += canvasWidth - skBallBounds.Right;
                 }
@@ -89,14 +94,15 @@ namespace BouncingBallSim.Simulation
                 if ((skBallBounds.Top < 0 && skVelocity.Y < 0) || (skBallBounds.Bottom > canvasHeight && skVelocity.Y > 0))
                 {
                     skForce.Y = -(float)(skVelocity.Y * (1 + CoefficientOfRestitution) / dt);
+
+                    // Physically move the ball back to the wall
                     if (skBallBounds.Top < 0 && skVelocity.Y < 0) skPosition.Y += skBallBounds.Top;
                     else skPosition.Y += canvasHeight - skBallBounds.Bottom;
                 }
 
-                // Add in touch forces and rest force vector
+                // Add in touch forces and reset touch force vector
                 if (skTouchForce.X != 0 || skTouchForce.Y != 0)
                 {
-                    Debug.WriteLine($"Adding forces: {skTouchForce}");
                     skForce += skTouchForce;
                     skTouchForce = new Vector2(0);
                 }
@@ -208,6 +214,8 @@ namespace BouncingBallSim.Simulation
                         touching = true;
                         skTouchForce = new Vector2(0);
                         oldTouchLocation = e.Location;
+
+                        // Snap ball to touch position
                         skPosition.X = e.Location.X;
                         skPosition.Y = e.Location.Y;
                         skVelocity.X = 0;
@@ -220,6 +228,8 @@ namespace BouncingBallSim.Simulation
                     {
                         diffLocation = e.Location - oldTouchLocation;
                         oldTouchLocation = e.Location;
+
+                        // Drag the ball around the screen
                         skPosition.X = e.Location.X;
                         skPosition.Y = e.Location.Y;
                     }
@@ -228,6 +238,7 @@ namespace BouncingBallSim.Simulation
                 case SKTouchAction.Released:
                     if (touching)
                     {
+                        // Compute force based on lat movement
                         skTouchForce.X = diffLocation.X * ForceScale;
                         skTouchForce.Y = diffLocation.Y * ForceScale;
                     }
